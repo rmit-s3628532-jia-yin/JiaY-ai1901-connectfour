@@ -99,8 +99,8 @@ class StudentAgent(RandomAgent):
         worst state is opponent winning the game
         """
         if self.winner(board) == self.id % 2 + 1:
-        	# print("losing!")
-        	return -1.0
+            print("losing!")
+            return -1.0
         if self.winner(board) == self.id:
             # print("winning!")
             return 1.0
@@ -171,16 +171,23 @@ class StudentAgent(RandomAgent):
         do the same for opponent tokens except that we lose score based on the number of tokens in place
         """
         heuristic = 0
-        points_2_in_place = 3    #  points added to heuristic when 2 tokens are in place
-        points_3_in_place = 10
+        #   horizontal gets the most points because we can place token in the middle, on the left, or on the right to form a line
+        #   diagonal gets the second most points because the chance of forming a diagonal is not as much as forming a line horizontally
+        #   vertical gets the least points becase we can only place a token on the top to form a line, and it's easily blocked
+        horizontal_points_2_in_place = 4    #  points added to heuristic when 2 tokens are in place
+        horizontal_points_3_in_place = 30
+        vertical_points_2_in_place = 1
+        vertical_points_3_in_place = 2
+        diagonal_points_2_in_place = 3
+        diagonal_points_3_in_place = 20
         
-        max_horizontal, max_vertical, max_diagonal = points_3_in_place * 4 * board.height, points_3_in_place * 3 * board.width, points_3_in_place * 4 * 3 * 2
+        max_horizontal, max_vertical, max_diagonal = horizontal_points_3_in_place * 4 * board.height, vertical_points_3_in_place * 3 * board.width, diagonal_points_3_in_place * 4 * 3 * 2
         
         max = max_horizontal + max_vertical + max_diagonal
         
-        heuristic += self._horizontal_check(board, points_2_in_place, points_3_in_place)
-        heuristic += self._vertical_check(board, points_2_in_place, points_3_in_place)
-        heuristic += self._diagonal_check(board, points_2_in_place, points_3_in_place)
+        heuristic += self._horizontal_check(board, horizontal_points_2_in_place, horizontal_points_3_in_place)
+        heuristic += self._vertical_check(board, vertical_points_2_in_place, vertical_points_3_in_place)
+        heuristic += self._diagonal_check(board, diagonal_points_2_in_place, diagonal_points_3_in_place)
         
         return heuristic, max
     
@@ -214,8 +221,10 @@ class StudentAgent(RandomAgent):
                 	can_connect_4 = True
                 	continue
                 if num_tokens_in_place == 2:
+#                    print("2 tokens")
                     heuristic += points_2_in_place  # get points
                 if num_tokens_in_place == 3:
+#                    print("3 tokens")
                     heuristic += points_3_in_place
                 num_tokens_in_place = 0
         
@@ -238,8 +247,10 @@ class StudentAgent(RandomAgent):
                     can_connect_4 = True
                     continue
                 if num_tokens_in_place == 2:
+#                    print("2 opponent tokens")
                     heuristic -= points_2_in_place  #   lose points
                 if num_tokens_in_place == 3:
+#                    print("3 opponent tokens")
                     heuristic -= points_3_in_place
                 num_tokens_in_place = 0
     
@@ -274,8 +285,10 @@ class StudentAgent(RandomAgent):
                     can_connect_4 = True
                     continue
                 if num_tokens_in_place == 2:
+                    print("2 tokens are in place")
                     heuristic += points_2_in_place  # get points
                 if num_tokens_in_place == 3:
+                    print("3 tokens are in place")
                     heuristic += points_3_in_place
                 num_tokens_in_place = 0
                 
@@ -299,8 +312,10 @@ class StudentAgent(RandomAgent):
                     can_connect_4 = True
                     continue
                 if num_tokens_in_place == 2:
+                    print("2 opponent tokens are in place")
                     heuristic -= points_2_in_place  #   lose points
                 if num_tokens_in_place == 3:
+                    print("3 opponent tokens are in place")
                     heuristic -= points_3_in_place
                 num_tokens_in_place = 0
                 
