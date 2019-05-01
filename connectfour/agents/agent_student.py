@@ -98,19 +98,20 @@ class StudentAgent(RandomAgent):
         best state is winning the game by connecting 4 tokens
         worst state is opponent winning the game
         """
-        if self.winner(board) == self.id:
-        	# print("winning!")
-        	return 1.0
         if self.winner(board) == self.id % 2 + 1:
         	# print("losing!")
         	return -1.0
+        if self.winner(board) == self.id:
+            # print("winning!")
+            return 1.0
         
         #   put tokens in the center column as much as possible
+        #   get points for my tokens in the middle, lose points for opponent tokens
         heuristic, old_max = self.control_center(board)
         sum_heuristics += heuristic
         sum_old_max += old_max
         
-        #   put more tokens in a line horizontally, vertically or diagonally
+        #   try to connect four tokens
         heuristic, old_max = self.can_get_4_in_a_line(board)
         sum_heuristics += heuristic
         sum_old_max += old_max
