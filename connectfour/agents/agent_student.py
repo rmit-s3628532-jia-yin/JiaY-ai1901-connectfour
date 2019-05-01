@@ -1,11 +1,11 @@
 from connectfour.agents.computer_player import RandomAgent
 import random
+import copy
 
 class StudentAgent(RandomAgent):
     def __init__(self, name):
         super().__init__(name)
-        self.MaxDepth = 1
-
+        self.MaxDepth = 4
 
     def get_move(self, board):
         """
@@ -87,11 +87,43 @@ class StudentAgent(RandomAgent):
             next_state(turn)
             winner()
         """
+        
+        sum_heuristics = 0   # sum of heuristics
+        sum_old_max = 0     # sum of max value of each heuristic
+        
         heuristic = 0
-
+        old_max = 0
+        
+        """
+        best state is winning the game by connecting 4 tokens
+        worst state is opponent winning the game
+        """
+        if self.winner(board) == self.id:
+        	# print("winning!")
+        	return 1.0
+        if self.winner(board) == self.id % 2 + 1:
+        	# print("losing!")
+        	return -1.0
+        
         #   put tokens in the center column as much as possible
-        heuristic += self.control_center(board)
-        return heuristic
+        heuristic, old_max = self.control_center(board)
+        sum_heuristics += heuristic
+        sum_old_max += old_max
+        
+        #   put more tokens in a line horizontally, vertically or diagonally
+        heuristic, old_max = self.can_get_4_in_a_line(board)
+        sum_heuristics += heuristic
+        sum_old_max += old_max
+        
+        """
+        fit the value between -1 and 1
+        """
+        new_max = 1.0
+        new_min = -1.0
+        
+        value = self.fit_range(sum_old_max, 0 - sum_old_max, new_max, new_min, sum_heuristics)
+        
+        return value
     
     def control_center(self, board):
         """
@@ -100,14 +132,14 @@ class StudentAgent(RandomAgent):
         get score for my tokens
         lose score for opponent's tokens
         """
-        heuristic = 0
+        heuristic = 0   # value of this heuristic function
         center_column = 3
         score_center_col = 5
         score_2_4_col = 3
         score_1_5_col = 2
         
-        old_max, old_min, new_max, new_min = 0, 0, 0, 0
-
+        max = 0     #   maximum value of this heuristic
+        
         for x in range(board.height):
             #   center column
             if board.get_cell_value(x, center_column) == self.id:
@@ -126,19 +158,344 @@ class StudentAgent(RandomAgent):
                 heuristic += score_1_5_col
             if board.get_cell_value(x, 1) == self.id % 2 + 1 or board.get_cell_value(x, 5) == self.id % 2 + 1:
                 heuristic -= score_1_5_col
-        
-        """
-        fit the value between -1 and 1
-        """
-        old_max = score_center_col * board.height + score_2_4_col * board.height * 2.0 + score_1_5_col * board.height * 2.0
-        old_min = 0 - old_max
-        new_max = 1.0
-        new_min = -1.0
-        
-        value = self.fit_range(old_max, old_min, new_max, new_min, heuristic)
+    
+        max = score_center_col * board.height + score_2_4_col * board.height * 2.0 + score_1_5_col * board.height * 2.0
 
-        return value
+        return heuristic, max
 
+    def can_get_4_in_a_line(self, board):
+        """
+        check if it's possible to get 4 of my tokens to be adjacent horizontally, vertically or diagonally
+        if so, get points based on the number of my tokens in place i.e. if 2 tokens are in place, gain 3 points. if 3 tokens are in place, gain 10 points
+        do the same for opponent tokens except that we lose score based on the number of tokens in place
+        """
+        heuristic = 0
+        points_2_in_place = 3    #  points added to heuristic when 2 tokens are in place
+        points_3_in_place = 10
+        
+        max_horizontal, max_vertical, max_diagonal = points_3_in_place * 4 * board.height, points_3_in_place * 3 * board.width, points_3_in_place * 4 * 3 * 2
+        
+        max = max_horizontal + max_vertical + max_diagonal
+        
+        heuristic += self._horizontal_check(board, points_2_in_place, points_3_in_place)
+        heuristic += self._vertical_check(board, points_2_in_place, points_3_in_place)
+        heuristic += self._diagonal_check(board, points_2_in_place, points_3_in_place)
+        
+        return heuristic, max
+    
+    def _horizontal_check(self, board, points_2_in_place, points_3_in_place):
+        """
+        for each row, there are 4 possible ways to connect 4 tokens
+        check each of these 4 possibilities, and count how many tokens are in place
+        get or lose points based on the number of my tokens and opponent tokens
+        """
+        heuristic = 0
+        count_ways_to_connect4 = 4
+        num_tokens_in_place = 0
+        can_connect_4 = True	# if there is an opponent token in the line, make it false
+        
+        #   calculate points for me
+        for row in range(board.height):
+            start = 0
+            end = 4
+            for i in range(count_ways_to_connect4):
+                for col in range(start + i, end + i):
+                	# if there is an opponent token in the line, don't check the following cells
+                	# and don't get any points for the current check
+                    if board.get_cell_value(row, col) == self.id % 2 + 1:
+                    	can_connect_4 = False
+                    	break
+                    if board.get_cell_value(row, col) == self.id:
+                        num_tokens_in_place += 1
+
+                if can_connect_4 == False:
+                	num_tokens_in_place = 0
+                	can_connect_4 = True
+                	continue
+                if num_tokens_in_place == 2:
+                    heuristic += points_2_in_place  # get points
+                if num_tokens_in_place == 3:
+                    heuristic += points_3_in_place
+                num_tokens_in_place = 0
+        
+        can_connect_4 = True
+        num_tokens_in_place = 0
+        #   calculate points for opponent
+        for row in range(board.height):
+            start = 0
+            end = 4
+            for i in range(count_ways_to_connect4):
+                for col in range(start + i, end + i):
+                    if board.get_cell_value(row, col) == self.id:
+                    	can_connect_4 = False
+                    	break
+                    if board.get_cell_value(row, col) == self.id % 2 + 1:
+                        num_tokens_in_place += 1
+
+                if can_connect_4 == False:
+                    num_tokens_in_place = 0
+                    can_connect_4 = True
+                    continue
+                if num_tokens_in_place == 2:
+                    heuristic -= points_2_in_place  #   lose points
+                if num_tokens_in_place == 3:
+                    heuristic -= points_3_in_place
+                num_tokens_in_place = 0
+    
+    
+        return heuristic
+    
+    def _vertical_check(self, board, points_2_in_place, points_3_in_place):
+        """
+        for each column, do the same as in horizontal check
+        """
+        heuristic = 0
+        count_ways_to_connect4 = 3
+        num_tokens_in_place = 0
+        can_connect_4 = True    # if there is an opponent token in the line, make it false
+        
+        #   calculate points for me
+        for col in range(board.width):
+            start = 0
+            end = 4
+            for i in range(count_ways_to_connect4):
+                for row in range(start + i, end + i):
+                    # if there is an opponent token in the line, don't check the following cells
+                    # and don't get any points for the current check
+                    if board.get_cell_value(row, col) == self.id % 2 + 1:
+                        can_connect_4 = False
+                        break
+                    if board.get_cell_value(row, col) == self.id:
+                        num_tokens_in_place += 1
+            
+                if can_connect_4 == False:
+                    num_tokens_in_place = 0
+                    can_connect_4 = True
+                    continue
+                if num_tokens_in_place == 2:
+                    heuristic += points_2_in_place  # get points
+                if num_tokens_in_place == 3:
+                    heuristic += points_3_in_place
+                num_tokens_in_place = 0
+                
+        can_connect_4 = True
+        num_tokens_in_place = 0
+        
+        #   calculate points for opponent
+        for column in range(board.width):
+            start = 0
+            end = 4
+            for i in range(count_ways_to_connect4):
+                for row in range(start + i, end + i):
+                    if board.get_cell_value(row, col) == self.id:
+                        can_connect_4 = False
+                        break
+                    if board.get_cell_value(row, col) == self.id % 2 + 1:
+                        num_tokens_in_place += 1
+            
+                if can_connect_4 == False:
+                    num_tokens_in_place = 0
+                    can_connect_4 = True
+                    continue
+                if num_tokens_in_place == 2:
+                    heuristic -= points_2_in_place  #   lose points
+                if num_tokens_in_place == 3:
+                    heuristic -= points_3_in_place
+                num_tokens_in_place = 0
+                
+        # print(heuristic)
+        return heuristic
+    
+    def _diagonal_check(self, board, points_2_in_place, points_3_in_place):
+        heuristic = 0
+        count_ways_to_connect4 = 4
+        num_tokens_in_place = 0
+        can_connect_4 = True    # if there is an opponent token in the line, make it false
+        
+        #   top-left to bottom-right diagonal
+        
+        #   calculate points for me
+        for row in range(3):
+            start = 0
+            end = 4
+            for i in range(count_ways_to_connect4):
+                row_offset = 0
+                for col in range(start + i, end + i):
+                    # if there is an opponent token in the line, don't check the following cells
+                    # and don't get any points for the current check
+                    if board.get_cell_value(row + row_offset, col) == self.id % 2 + 1:
+                        can_connect_4 = False
+                        break
+                    if board.get_cell_value(row + row_offset, col) == self.id:
+                        num_tokens_in_place += 1
+                    row_offset += 1
+                        
+                if can_connect_4 == False:
+                    num_tokens_in_place = 0
+                    can_connect_4 = True
+                    continue
+                if num_tokens_in_place == 2:
+                    heuristic += points_2_in_place  # get points
+                if num_tokens_in_place == 3:
+                    heuristic += points_3_in_place
+                num_tokens_in_place = 0
+                
+        can_connect_4 = True
+        num_tokens_in_place = 0
+        #   calculate points for opponent
+        for row in range(3):
+            start = 0
+            end = 4
+            for i in range(count_ways_to_connect4):
+                row_offset = 0
+                for col in range(start + i, end + i):
+                    if board.get_cell_value(row + row_offset, col) == self.id:
+                        can_connect_4 = False
+                        break
+                    if board.get_cell_value(row + row_offset, col) == self.id % 2 + 1:
+                        num_tokens_in_place += 1
+                    row_offset += 1
+
+                if can_connect_4 == False:
+                    num_tokens_in_place = 0
+                    can_connect_4 = True
+                    continue
+                if num_tokens_in_place == 2:
+                    heuristic -= points_2_in_place  #   lose points
+                if num_tokens_in_place == 3:
+                    heuristic -= points_3_in_place
+                num_tokens_in_place = 0
+        
+        #   bottom-left to top-right diagonal
+        
+        #   calculate points for me
+        for row in range(3, 6):
+            start = 0
+            end = 4
+            for i in range(count_ways_to_connect4):
+                row_offset = 0
+                for col in range(start + i, end + i):
+                    # if there is an opponent token in the line, don't check the following cells
+                    # and don't get any points for the current check
+                    if board.get_cell_value(row - row_offset, col) == self.id % 2 + 1:
+                        can_connect_4 = False
+                        break
+                    if board.get_cell_value(row - row_offset, col) == self.id:
+                        num_tokens_in_place += 1
+                    row_offset += 1
+                
+                if can_connect_4 == False:
+                    num_tokens_in_place = 0
+                    can_connect_4 = True
+                    continue
+                if num_tokens_in_place == 2:
+                    heuristic += points_2_in_place  # get points
+                if num_tokens_in_place == 3:
+                    heuristic += points_3_in_place
+                num_tokens_in_place = 0
+
+        can_connect_4 = True
+        num_tokens_in_place = 0
+        #   calculate points for opponent
+        for row in range(3, 6):
+            start = 0
+            end = 4
+            for i in range(count_ways_to_connect4):
+                row_offset = 0
+                for col in range(start + i, end + i):
+                    if board.get_cell_value(row - row_offset, col) == self.id:
+                        can_connect_4 = False
+                        break
+                    if board.get_cell_value(row - row_offset, col) == self.id % 2 + 1:
+                        num_tokens_in_place += 1
+                    row_offset += 1
+                
+                if can_connect_4 == False:
+                    num_tokens_in_place = 0
+                    can_connect_4 = True
+                    continue
+                if num_tokens_in_place == 2:
+                    heuristic -= points_2_in_place  #   lose points
+                if num_tokens_in_place == 3:
+                    heuristic -= points_3_in_place
+                num_tokens_in_place = 0
+
+        return heuristic
+    
+    def winner(self, board):
+        """
+        Takes the board as input and determines if there is a winner.
+        If the game has a winner, it returns the player number (Player One = 1, Player Two = 2).
+        If the game is still ongoing, it returns zero.
+        """
+        row_winner = self._check_rows(board)
+        if row_winner:
+            return row_winner
+        col_winner = self._check_columns(board)
+        #print("col winner = ", col_winner)
+        if col_winner:
+            return col_winner
+        diag_winner = self._check_diagonals(board)
+        if diag_winner:
+            return diag_winner
+        return 0  # no winner yet
+
+    def _check_rows(self, board):
+        for row in board.board:
+            same_count = 1
+            curr = row[0]
+            for i in range(1, board.width):
+                if row[i] == curr:
+                    same_count += 1
+                    if same_count == board.num_to_connect and curr != 0:
+                        return curr
+                else:
+                    same_count = 1
+                    curr = row[i]
+        return 0
+
+    def _check_columns(self, board):
+        for i in range(board.width):
+            same_count = 1
+            curr = board.board[0][i]
+            for j in range(1, board.height):
+                if board.board[j][i] == curr:
+                    same_count += 1
+                    if same_count == board.num_to_connect and curr != 0:
+                        return curr
+                else:
+                    same_count = 1
+                    curr = board.board[j][i]
+        return 0
+
+    def _check_diagonals(self, board):
+        boards = [
+            board.board,
+            [row[::-1] for row in copy.deepcopy(board.board)]
+        ]
+
+        for b in boards:
+            for i in range(board.width - board.num_to_connect + 1):
+                for j in range(board.height - board.num_to_connect + 1):
+                    if i > 0 and j > 0:  # would be a redundant diagonal
+                        continue
+
+                    # (j, i) is start of diagonal
+                    same_count = 1
+                    curr = b[j][i]
+                    k, m = j + 1, i + 1
+                    while k < board.height and m < board.width:
+                            if b[k][m] == curr:
+                                same_count += 1
+                                if same_count is board.num_to_connect and curr != 0:
+                                    return curr
+                            else:
+                                same_count = 1
+                                curr = b[k][m]
+                            k += 1
+                            m += 1
+        return 0
+    
     def fit_range(self, old_max, old_min, new_max, new_min, old_value):
         """
         fit number range to range from -1 to 1
