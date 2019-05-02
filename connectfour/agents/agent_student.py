@@ -115,7 +115,8 @@ class StudentAgent(RandomAgent):
         heuristic, old_max = self.can_get_4_in_a_line(board)
         sum_heuristics += heuristic
         sum_old_max += old_max
-
+        
+        # set up multidirectional attack by placing 3 tokens in a line while the cells to the left and right are empty
         heuristic, old_max = self.set_up_multidirectional_attack(board)
         sum_heuristics += heuristic
         sum_old_max += old_max
