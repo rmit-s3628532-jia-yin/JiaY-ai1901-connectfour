@@ -99,7 +99,7 @@ class StudentAgent(RandomAgent):
         worst state is opponent winning the game
         """
         if self.winner(board) == self.id % 2 + 1:
-            print("losing!")
+            # print("losing!")
             return -1.0
         if self.winner(board) == self.id:
             # print("winning!")
@@ -113,6 +113,10 @@ class StudentAgent(RandomAgent):
         
         #   try to connect four tokens
         heuristic, old_max = self.can_get_4_in_a_line(board)
+        sum_heuristics += heuristic
+        sum_old_max += old_max
+
+        heuristic, old_max = self.set_up_multidirectional_attack(board)
         sum_heuristics += heuristic
         sum_old_max += old_max
         
@@ -135,8 +139,8 @@ class StudentAgent(RandomAgent):
         """
         heuristic = 0   # value of this heuristic function
         center_column = 3
-        score_center_col = 5
-        score_2_4_col = 3
+        score_center_col = 6
+        score_2_4_col = 4
         score_1_5_col = 2
         
         max = 0     #   maximum value of this heuristic
@@ -285,10 +289,10 @@ class StudentAgent(RandomAgent):
                     can_connect_4 = True
                     continue
                 if num_tokens_in_place == 2:
-                    print("2 tokens are in place")
+                    # print("2 tokens are in place")
                     heuristic += points_2_in_place  # get points
                 if num_tokens_in_place == 3:
-                    print("3 tokens are in place")
+                    # print("3 tokens are in place")
                     heuristic += points_3_in_place
                 num_tokens_in_place = 0
                 
@@ -312,10 +316,10 @@ class StudentAgent(RandomAgent):
                     can_connect_4 = True
                     continue
                 if num_tokens_in_place == 2:
-                    print("2 opponent tokens are in place")
+                    # print("2 opponent tokens are in place")
                     heuristic -= points_2_in_place  #   lose points
                 if num_tokens_in_place == 3:
-                    print("3 opponent tokens are in place")
+                    # print("3 opponent tokens are in place")
                     heuristic -= points_3_in_place
                 num_tokens_in_place = 0
                 
@@ -437,7 +441,69 @@ class StudentAgent(RandomAgent):
                 num_tokens_in_place = 0
 
         return heuristic
-    
+
+    def set_up_multidirectional_attack(self, board):
+        """
+        set up a multidirectional attack i.e. place three adjacent tokens in a row while the
+        cell on the left and right are empty, so we can win in both directions
+        same applies to diagonals
+        do the same for the opponent, but lose score for satisfied condition
+        """
+        heuristic = 0
+        empty = 0
+        count_ways_to_set_up_horizontal = 3 # there are 3 ways to set up a multidirectional attack in a row
+        count_ways_to_set_up_diagonal = 3
+        num_cells_to_check = 5
+        points_horizontal = 50
+        points_diagonal = 50
+
+        max = points_horizontal * count_ways_to_set_up_horizontal * board.height + points_diagonal * count_ways_to_set_up_diagonal * 2
+
+        # horizontal
+        for row in range(board.height):
+            for i in range(count_ways_to_set_up_horizontal):
+                currCells = []
+                for j in range(num_cells_to_check):
+                    currCells.append(board.get_cell_value(row, j + i))
+            # if multidirectional attack conditions are satisfied
+            if currCells[0] == empty and currCells[1] == self.id and currCells[2] == self.id and currCells[3] == self.id and currCells[4] == empty:
+                heuristic += points_horizontal  # get points
+            if currCells[0] == empty and currCells[1] == self.id % 2 + 1 and currCells[2] == self.id % 2 + 1 and currCells[3] == self.id % 2 + 1 and currCells[4] == empty:
+                heuristic -= points_horizontal  # lose points
+            currCells = []
+
+        # top-left to bottom-right diagonal
+        for row in range(2):
+            for i in range(count_ways_to_set_up_diagonal):
+                row_offset = 0
+                currCells = []
+                for j in range(num_cells_to_check):
+                    currCells.append(board.get_cell_value(row + row_offset, j + i))
+                    row_offset += 1
+            # if multidirectional attack conditions are satisfied
+            if currCells[0] == empty and currCells[1] == self.id and currCells[2] == self.id and currCells[3] == self.id and currCells[4] == empty:
+                heuristic += points_diagonal  # get points
+            if currCells[0] == empty and currCells[1] == self.id % 2 + 1 and currCells[2] == self.id % 2 + 1 and currCells[3] == self.id % 2 + 1 and currCells[4] == empty:
+                heuristic -= points_diagonal  # lose points
+            currCells = []
+
+        # bottom-left to top-right diagonal
+        for row in range(4, 6):
+            for i in range(count_ways_to_set_up_diagonal):
+                row_offset = 0
+                currCells = []
+                for j in range(num_cells_to_check):
+                    currCells.append(board.get_cell_value(row - row_offset, j + i))
+                    row_offset += 1
+            # if multidirectional attack conditions are satisfied
+            if currCells[0] == empty and currCells[1] == self.id and currCells[2] == self.id and currCells[3] == self.id and currCells[4] == empty:
+                heuristic += points_diagonal  # get points
+            if currCells[0] == empty and currCells[1] == self.id % 2 + 1 and currCells[2] == self.id % 2 + 1 and currCells[3] == self.id % 2 + 1 and currCells[4] == empty:
+                heuristic -= points_diagonal  # lose points
+            currCells = []
+
+        return heuristic, max
+
     def winner(self, board):
         """
         Takes the board as input and determines if there is a winner.
